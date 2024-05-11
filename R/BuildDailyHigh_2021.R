@@ -5,8 +5,8 @@ library(dplyr)
 library(lubridate)
 library(stringr)
 
-ghcn <- read_csv("data/GHCN_USW00014839.csv") %>%
-  filter(year < 2022)
+ghcn <- read_csv("data/DailyTemp_Madison.csv") %>%
+  filter(year < 2024)
 
 year.to.plot <- max(ghcn$year)
 last.date <- max(ghcn$date)
@@ -196,7 +196,10 @@ max.graph2 <- max.graph +
                            min.segment.length = 0, size = 3,
                            direction = "y", hjust = 1, nudge_x = -5)
 
-ggsave("graphs/DailyHighTemp_USW00014839_2021.png", plot = max.graph2,
+ggsave("graphs/DailyHighTemp_Madison_2023.png", plot = max.graph2,
        width = 8, height = 4)
 
+
+# ggsave("graphs/DailyHighTemp_USW00014839_2021.png", plot = max.graph2,
+#        width = 8, height = 4)
 

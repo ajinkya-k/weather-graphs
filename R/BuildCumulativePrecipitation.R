@@ -23,8 +23,7 @@ past.years <- ghcn %>%
   ungroup()
 
 past.years %>%
-  ggplot(aes(day_of_year, cum_precip, group = year)) +
-  geom_step(size = 0.1)
+  ggplot(aes(day_of_year, cum_precip, group = year)) +  geom_step(size = 0.1)
 
 daily.summary.stats <- past.years %>%
   filter(year != year.to.plot) %>%

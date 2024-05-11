@@ -5,17 +5,18 @@ library(dplyr)
 library(lubridate)
 library(stringr)
 
-ghcn <- read_csv("data/GHCN_USW00014839.csv")
+ghcn <- read_csv("data/DailyTemp_Madison.csv")
 
-year.to.plot <- max(ghcn$year)
-last.date <- max(ghcn$date)
+year.to.plot <- max(ghcn$year)-1
+last.date <- max(ghcn[ghcn$year == year.to.plot, ]$date)
+first.date <- min(ghcn$date)
 
 this.year <- ghcn %>%
   filter(year == year.to.plot)
 
 daily.summary.stats <- ghcn %>%
-  filter(year != year.to.plot) %>%
-  select(day_of_year, PRCP, TMAX, TMIN) %>%
+  filter(year < year.to.plot) %>%
+  select(day_of_year, PRCP, TMAX, TMIN, TAVG) %>%
   pivot_longer(cols = -day_of_year) %>%
   group_by(day_of_year, name) %>%
   summarise(max = max(value, na.rm = T),
@@ -38,7 +39,7 @@ month.breaks <- ghcn %>%
   mutate(month_name = month.abb)
 
 record.status.this.year <- this.year %>%
-  select(day_of_year, PRCP, TMAX, TMIN) %>%
+  select(day_of_year, PRCP, TMAX, TMIN, TAVG) %>%
   pivot_longer(cols = -day_of_year, values_to = "this_year") %>%
   inner_join(daily.summary.stats %>% select(-starts_with("x"))) %>%
   mutate(record_status = case_when(
@@ -48,41 +49,45 @@ record.status.this.year <- this.year %>%
   )) %>%
   filter(record_status != "none")
 
+col_pal <- RColorBrewer::brewer.pal(5, "YlGnBu")[2:5]
+
+
+t_var = "TAVG"
 max.graph <- daily.summary.stats %>%
-  filter(name == "TMAX") %>%
+  filter(name == t_var) %>%
   ggplot(aes(x = day_of_year)) +
   # draw vertical lines for the months
   geom_vline(xintercept = c(month.breaks$day_of_year, 365),
              linetype = "dotted", lwd = 0.2) +
   # ribbon between the lowest and 5th, 95th and max percentiles
   geom_ribbon(aes(ymin = min, ymax = max),
-              fill = "#bdc9e1") +
+              fill = col_pal[1]) +
   # ribbon between the 5th and 20th, 80th to 95th percentiles
   geom_ribbon(aes(ymin = x5, ymax = x95),
-              fill = "#74a9cf") +
+              fill =col_pal[2]) +
   # ribbon between the 20th and 40th, 60th and 80th percentiles
   geom_ribbon(aes(ymin = x20, ymax = x80),
-              fill = "#2b8cbe") +
+              fill = col_pal[3]) +
   # ribbon between the 40th and 60th percentiles
   geom_ribbon(aes(ymin = x40, ymax = x60),
-              fill = "#045a8d") +
+              fill = col_pal[4]) +
   # y-axis breaks
-  geom_hline(yintercept = seq(-10, 100, 10),
+  geom_hline(yintercept = seq(-20, 100, 10),
              color = "white", lwd = 0.1) +
   # line for this year's values
   geom_line(data = this.year,
-            aes(y = TMAX), lwd = 1) +
+            aes(y = get(t_var)), lwd = 0.8) +
   # points for maximum records set this year
   geom_point(data = filter(record.status.this.year, 
-                           name == "TMAX",
+                           name == t_var,
                            record_status == "max"),
-             aes(y = this_year), color = "red") +
+             aes(y = this_year), shape = 21, size = 2, color = "black", fill = "white") +
   # points for minimum records set this year
   geom_point(data = filter(record.status.this.year,
-                           name == "TMAX",
+                           name == t_var,
                            record_status == "min"),
-             aes(y = this_year), color = "blue") +
-  scale_y_continuous(breaks = seq(-10, 100, 10),
+             aes(y = this_year), shape = 21, size = 2, color = "black", fill = "white") +
+  scale_y_continuous(breaks = seq(-40, 100, 10),
                      labels = scales::unit_format(suffix = "°"),
                      expand = expansion(0.01),
                      name = NULL,
@@ -91,14 +96,14 @@ max.graph <- daily.summary.stats %>%
                      breaks = month.breaks$day_of_year + 15,
                      labels = month.breaks$month_name,
                      name = NULL) +
-  labs(title = "Daily High Temperature at Milwaukee's Mitchell Airport",
+  labs(title = "Daily High Temperature at Madison",
        subtitle = paste("The line shows daily highs for",
                         paste0(lubridate::year(last.date), "."),
                         "The ribbons cover the",
                         "historical range. The last date shown is", 
                         format(last.date, "%b %d, %Y.")),
-       caption = paste("Records begin on April 1, 1938.",
-                       "This graph was last updated on", format(Sys.Date(), "%B %d, %Y."))) +
+       caption = paste("Records begin on", format(first.date, "%b %d %Y"), 
+                       ". This graph was last updated on", format(Sys.Date(), "%B %d, %Y."))) +
   theme(panel.background = element_blank(),
         panel.border = element_blank(),
         panel.grid = element_blank(),
@@ -108,6 +113,7 @@ max.graph <- daily.summary.stats %>%
         plot.title = element_text(face = "bold", size = 16),
         axis.ticks = element_blank())
 
+max.graph
 
 legend.df <- daily.summary.stats %>%
   filter(day_of_year %in% 165:201,
@@ -161,24 +167,24 @@ max.graph2 <- max.graph +
   # ribbon between the lowest and 5th percentiles
   geom_ribbon(data = legend.df,
               aes(ymin = min, ymax = max),
-              fill = "#bdc9e1") +
+              fill = col_pal[1]) +
   # ribbon between the 5th and 20th percentiles
   geom_ribbon(data = legend.df,
               aes(ymin = x5, ymax = x95),
-              fill = "#74a9cf") +
+              fill = col_pal[2]) +
   # ribbon between the 20th and 40th percentiles
   geom_ribbon(data = legend.df,
               aes(ymin = x20, ymax = x80),
-              fill = "#2b8cbe") +
+              fill = col_pal[3]) +
   # ribbon between the 40th and 60th percentiles
   geom_ribbon(data = legend.df,
               aes(ymin = x40, ymax = x60),
-              fill = "#045a8d") +
-  geom_line(data = legend.line.df, aes(y = temp), lwd = 0.9) +
+              fill = col_pal[4]) +
+  geom_line(data = legend.line.df, aes(y = temp), lwd = 0.5) +
   geom_point(aes(x = 177, y = legend.line.df$temp[legend.line.df$day_of_year == 177]),
-             color = "blue") +
+             shape = 21, color = "black", fill = "white") +
   geom_point(aes(x = 189, y = legend.line.df$temp[legend.line.df$day_of_year == 189]),
-             color = "red") +
+             shape = 21, color = "black", fill = "white") +
   geom_text(aes(x = 180, y = legend.line.df$temp[legend.line.df$day_of_year == 177] - 2,
                 label = "all-time record low set this year"),
             hjust = 0, size = 3) +
@@ -196,7 +202,7 @@ max.graph2 <- max.graph +
                            min.segment.length = 0, size = 3,
                            direction = "y", hjust = 1, nudge_x = -5)
 
-ggsave("graphs/DailyHighTemp_USW00014839.png", plot = max.graph2,
-       width = 8, height = 4)
+ggsave("graphs/DailyHighTemp_Madison.png", plot = max.graph2,
+       width = 12, height = 4)
 
 
